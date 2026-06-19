@@ -1,10 +1,9 @@
 import json, os
+# pyrefly: ignore [missing-import]
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from config import INDEX_DIR
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
+from services.embeddings import get_model
 
 def retrieve_chunks(doc_id: str, query: str, top_k: int = 5):
     index_path = os.path.join(INDEX_DIR, f"{doc_id}.index")
@@ -19,7 +18,7 @@ def retrieve_chunks(doc_id: str, query: str, top_k: int = 5):
 
     chunks = meta["chunks"]
     pages = meta.get("pages", [1] * len(chunks))
-    query_vec = model.encode([query]).astype(np.float32)
+    query_vec = get_model().encode([query]).astype(np.float32)
     distances, indices = index.search(query_vec, top_k)
 
     results = []

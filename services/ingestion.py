@@ -2,12 +2,10 @@ import os, uuid, json
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
 from config import UPLOAD_DIR, INDEX_DIR
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
+from services.embeddings import get_model
 
 def load_document(file_path: str, file_type: str):
     if file_type == "pdf":
@@ -41,7 +39,7 @@ def chunk_and_embed(page_texts: list, chunk_size: int, chunk_overlap: int):
             chunks.append(chunk)
             chunk_pages.append(page_data["page"])
     
-    embeddings = model.encode(chunks, show_progress_bar=False)
+    embeddings = get_model().encode(chunks, show_progress_bar=False)
     return chunks, chunk_pages, embeddings
 
 def save_faiss_index(doc_id: str, chunks: list, chunk_pages: list, embeddings):
