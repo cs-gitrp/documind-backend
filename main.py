@@ -8,7 +8,6 @@ from routers import documents, chat, settings
 from routers import search
 
 app = FastAPI(title="DocuMind AI API", version="1.0.0")
-app.include_router(search.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(search.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(settings.router)
