@@ -12,7 +12,13 @@ app.include_router(search.router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://documind-ai-ashy-ten.vercel.app",
+        "https://documind-ai-csdata294-3679s-projects.vercel.app",
+        "https://documind-79yy75tae-csdata294-3679s-projects.vercel.app",
+        ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
