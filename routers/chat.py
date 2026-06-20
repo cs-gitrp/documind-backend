@@ -1,6 +1,6 @@
 import uuid, json
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
 
 @router.post("/")
-def chat(req: ChatRequest, db: Session = Depends(get_db)):
+def chat(req: ChatRequest, x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
     settings = db.query(RAGSettings).filter(RAGSettings.id == 1).first()
     top_k = settings.top_k if settings else 5
     temperature = settings.temperature if settings else 0.7
@@ -37,7 +37,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         session = ChatSession(
             id=session_id,
             title=req.query[:60],
-            document_id=req.document_id
+            document_id=req.document_id,
+            client_id=x_client_id
         )
         db.add(session)
         db.commit()
@@ -84,8 +85,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     return StreamingResponse(generate(), media_type="text/plain")
 
 @router.get("/sessions")
-def get_sessions(db: Session = Depends(get_db)):
-    sessions = db.query(ChatSession).order_by(ChatSession.created_at.desc()).all()
+def get_sessions(x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    sessions = db.query(ChatSession).filter(ChatSession.client_id == x_client_id).order_by(ChatSession.created_at.desc()).all()
     return [
         {
             "id": s.id, "title": s.title, "document_id": s.document_id,

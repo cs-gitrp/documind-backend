@@ -32,6 +32,7 @@ class Document(Base):
     summary = Column(Text)
     upload_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     faiss_index_path = Column(String)
+    client_id = Column(String, nullable=True, default=None)
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
@@ -41,6 +42,7 @@ class ChatSession(Base):
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     message_count = Column(Integer, default=0)
+    client_id = Column(String, nullable=True, default=None)
 
 class Message(Base):
     __tablename__ = "messages"

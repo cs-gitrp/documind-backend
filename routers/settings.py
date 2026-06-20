@@ -1,6 +1,6 @@
 import os
 import shutil
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -28,20 +28,20 @@ def get_dir_size(path: str) -> float:
     return round(total / (1024 * 1024), 2)
 
 @router.get("/storage-stats")
-def get_storage_stats(db: Session = Depends(get_db)):
+def get_storage_stats(x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
     from models.database import Document
-    from config import UPLOAD_DIR, INDEX_DIR
 
-    documents_size = get_dir_size(UPLOAD_DIR)
-    index_size = get_dir_size(INDEX_DIR)
-    total_docs = db.query(Document).count()
+    docs = db.query(Document).filter(Document.client_id == x_client_id).all()
+    total_bytes = sum(d.file_size for d in docs if d.file_size is not None)
+    documents_mb = round(total_bytes / (1024 * 1024), 2)
+    index_mb = documents_mb
 
     return {
-        "documents_mb": documents_size,
-        "index_mb": index_size,
-        "total_mb": round(documents_size + index_size, 2),
+        "documents_mb": documents_mb,
+        "index_mb": index_mb,
+        "total_mb": round(documents_mb + index_mb, 2),
         "max_mb": 100,
-        "document_count": total_docs
+        "document_count": len(docs)
     }
 
 @router.get("/")
@@ -67,19 +67,23 @@ def update_settings(body: SettingsUpdate, db: Session = Depends(get_db)):
     return {"success": True}
 
 @router.delete("/storage")
-def clear_storage(db: Session = Depends(get_db)):
-    # Delete all uploaded files
-    if os.path.exists(UPLOAD_DIR):
-        shutil.rmtree(UPLOAD_DIR)
-        os.makedirs(UPLOAD_DIR)
+def clear_storage(x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    docs = db.query(Document).filter(Document.client_id == x_client_id).all()
+    for doc in docs:
+        doc_id = doc.id
+        # Delete uploaded files
+        for ext in ["pdf", "docx", "txt"]:
+            path = os.path.join(UPLOAD_DIR, f"{doc_id}.{ext}")
+            if os.path.exists(path):
+                os.remove(path)
+                
+        # Delete FAISS index
+        for suffix in [".index", "_meta.json"]:
+            path = os.path.join(INDEX_DIR, f"{doc_id}{suffix}")
+            if os.path.exists(path):
+                os.remove(path)
+                
+        db.delete(doc)
         
-    # Delete all FAISS indexes
-    if os.path.exists(INDEX_DIR):
-        shutil.rmtree(INDEX_DIR)
-        os.makedirs(INDEX_DIR)
-        
-    # Delete all document records from PostgreSQL/Supabase
-    db.query(Document).delete()
     db.commit()
-    
     return {"success": True, "message": "All documents and indexes deleted."}
