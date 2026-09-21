@@ -1,11 +1,15 @@
-import os, uuid, json
+import json
+import os
+
+import faiss
 import fitz  # PyMuPDF
+import numpy as np
 from docx import Document as DocxDocument
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import faiss
-import numpy as np
-from config import UPLOAD_DIR, INDEX_DIR
+
+from config import INDEX_DIR
 from services.embeddings import get_model
+
 
 def load_document(file_path: str, file_type: str):
     if file_type == "pdf":

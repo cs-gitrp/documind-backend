@@ -11,15 +11,14 @@ New:   retrieve_hybrid()  — used by chat and eval routers.
 """
 
 import json
-import os
-import math
 import logging
-from typing import List, Dict, Any
+import os
+from typing import Any
 
 import faiss
 import numpy as np
-from rank_bm25 import BM25Okapi          # pip install rank-bm25
 from flashrank import Ranker, RerankRequest  # pip install flashrank
+from rank_bm25 import BM25Okapi  # pip install rank-bm25
 
 from config import INDEX_DIR
 from services.embeddings import get_model
@@ -51,7 +50,7 @@ def _load_index_and_meta(doc_id: str):
     return index, meta
 
 
-def _dense_retrieve(index, meta, query: str, top_k: int) -> List[Dict]:
+def _dense_retrieve(index, meta, query: str, top_k: int) -> list[dict]:
     """Standard FAISS L2 search → returns list of {chunk, chunk_id, page, score}."""
     chunks = meta["chunks"]
     pages  = meta.get("pages", [1] * len(chunks))
@@ -70,7 +69,7 @@ def _dense_retrieve(index, meta, query: str, top_k: int) -> List[Dict]:
     return results
 
 
-def _bm25_retrieve(meta, query: str, top_k: int) -> List[Dict]:
+def _bm25_retrieve(meta, query: str, top_k: int) -> list[dict]:
     """BM25 Okapi retrieval over tokenised chunk corpus."""
     chunks = meta["chunks"]
     pages  = meta.get("pages", [1] * len(chunks))
@@ -93,19 +92,19 @@ def _bm25_retrieve(meta, query: str, top_k: int) -> List[Dict]:
 
 
 def _rrf_fuse(
-    dense_results: List[Dict],
-    bm25_results:  List[Dict],
+    dense_results: list[dict],
+    bm25_results:  list[dict],
     k: int = 60,
     dense_weight: float = 0.6,
     bm25_weight:  float = 0.4,
-) -> List[Dict]:
+) -> list[dict]:
     """
     Reciprocal Rank Fusion.
     score(d) = Σ  weight / (k + rank(d))
     k=60 is the standard RRF constant (prevents top-rank dominance).
     """
-    rrf_scores: Dict[int, float] = {}
-    chunk_map:  Dict[int, Dict]  = {}
+    rrf_scores: dict[int, float] = {}
+    chunk_map:  dict[int, dict]  = {}
 
     for rank, item in enumerate(dense_results):
         cid = item["chunk_id"]
@@ -127,7 +126,7 @@ def _rrf_fuse(
     return fused
 
 
-def _rerank(query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
+def _rerank(query: str, candidates: list[dict], top_k: int) -> list[dict]:
     """
     FlashRank cross-encoder reranker.
     Takes the RRF-fused candidates and re-scores them with a cross-encoder.
@@ -150,7 +149,7 @@ def _rerank(query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
 #  Public API
 # ─────────────────────────────────────────────
 
-def retrieve_chunks(doc_id: str, query: str, top_k: int = 5) -> List[Dict]:
+def retrieve_chunks(doc_id: str, query: str, top_k: int = 5) -> list[dict]:
     """
     LEGACY ENTRY POINT — kept for backward compatibility.
     Now internally runs hybrid retrieval + reranking.
@@ -164,7 +163,8 @@ def retrieve_hybrid(
     top_k:  int  = 5,
     overretrieve_factor: int  = 4,   # fetch 4× then rerank down to top_k
     use_reranker: bool = True,
-) -> List[Dict]:
+    diagnostics: bool = False,
+) -> list[dict] | dict[str, Any]:
     """
     Full pipeline:
         Dense (FAISS)  +  Sparse (BM25)  →  RRF fusion  →  FlashRank rerank
@@ -173,6 +173,7 @@ def retrieve_hybrid(
         overretrieve_factor: multiplier for initial candidates before reranking
     Returns:
         List of top_k dicts with keys: chunk, chunk_id, page, score, rrf_score, rerank_score
+        When diagnostics=True, returns the final results and IDs from each pipeline stage.
     """
     index, meta = _load_index_and_meta(doc_id)
     candidate_k  = top_k * overretrieve_factor
@@ -194,4 +195,14 @@ def retrieve_hybrid(
         "hybrid_retrieve doc=%s candidates=%d dense=%d bm25=%d final=%d",
         doc_id, len(fused), len(dense_results), len(bm25_results), len(final),
     )
+
+    if diagnostics:
+        return {
+            "results": final,
+            "dense_results": dense_results,
+            "bm25_results": bm25_results,
+            "rrf_candidates": fused,
+            "reranked_results": final,
+        }
+
     return final

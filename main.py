@@ -1,12 +1,15 @@
 # pyrefly: ignore [missing-import]
+import os
+
 from fastapi import FastAPI
+
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
-import os
+
 from models.database import init_db
-from routers import documents, chat, settings
-from routers import search
+from routers import chat, documents, search, settings
 from routers import eval as eval_router
+
 app = FastAPI(title="DocuMind AI API", version="1.0.0")
 
 app.add_middleware(

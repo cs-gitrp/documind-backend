@@ -10,7 +10,6 @@ Run: pytest tests/ -v
 import json
 import os
 import sys
-import tempfile
 import unittest
 
 import numpy as np
@@ -144,8 +143,9 @@ class TestEvalGoldenSetFormat(unittest.TestCase):
 
     def test_retrieval_eval_hit_calculation(self):
         """Verify Hit@k logic without hitting actual FAISS."""
-        from evals.eval_pipeline import evaluate_retrieval
         from unittest.mock import patch
+
+        from evals.eval_pipeline import evaluate_retrieval
 
         golden = [self._make_golden_item(chunk_id=2)]
 
@@ -162,8 +162,9 @@ class TestEvalGoldenSetFormat(unittest.TestCase):
         self.assertAlmostEqual(results["mrr"], 1.0)
 
     def test_retrieval_eval_miss_calculation(self):
-        from evals.eval_pipeline import evaluate_retrieval
         from unittest.mock import patch
+
+        from evals.eval_pipeline import evaluate_retrieval
 
         golden = [self._make_golden_item(chunk_id=99)]  # chunk 99 won't be in results
 
@@ -176,6 +177,54 @@ class TestEvalGoldenSetFormat(unittest.TestCase):
         self.assertEqual(results["hits"], 0)
         self.assertEqual(results["hit_rate_at_k"], 0.0)
         self.assertEqual(results["mrr"], 0.0)
+
+    def test_retrieval_eval_rank_two_and_rank_five(self):
+        from unittest.mock import patch
+
+        from evals.eval_pipeline import evaluate_retrieval
+
+        golden = [
+            self._make_golden_item(chunk_id=2),
+            self._make_golden_item(chunk_id=5),
+        ]
+        mock_results = [
+            {"chunk_id": 0}, {"chunk_id": 2}, {"chunk_id": 1},
+            {"chunk_id": 3}, {"chunk_id": 5},
+        ]
+        diagnostic_results = {
+            "results": mock_results,
+            "dense_results": mock_results,
+            "bm25_results": mock_results,
+            "rrf_candidates": mock_results,
+            "reranked_results": mock_results,
+        }
+        with patch("evals.eval_pipeline.retrieve_hybrid", return_value=diagnostic_results):
+            results = evaluate_retrieval(golden, top_k=5)
+
+        self.assertEqual(results["hits"], 2)
+        self.assertEqual([item["rank"] for item in results["per_question"]], [2, 5])
+        self.assertAlmostEqual(results["mrr"], (1 / 2 + 1 / 5) / 2)
+
+    def test_retrieval_eval_uses_first_relevant_id(self):
+        from unittest.mock import patch
+
+        from evals.eval_pipeline import evaluate_retrieval
+
+        golden = [self._make_golden_item(chunk_id=7)]
+        golden[0]["relevant_chunk_ids"] = [7, 2]
+        mock_results = [{"chunk_id": 0}, {"chunk_id": 2}, {"chunk_id": 7}]
+        diagnostic_results = {
+            "results": mock_results,
+            "dense_results": mock_results,
+            "bm25_results": mock_results,
+            "rrf_candidates": mock_results,
+            "reranked_results": mock_results,
+        }
+        with patch("evals.eval_pipeline.retrieve_hybrid", return_value=diagnostic_results):
+            results = evaluate_retrieval(golden, top_k=5)
+
+        self.assertEqual(results["per_question"][0]["rank"], 2)
+        self.assertAlmostEqual(results["mrr"], 0.5)
 
 
 if __name__ == "__main__":

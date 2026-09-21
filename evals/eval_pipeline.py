@@ -34,7 +34,7 @@ import os
 import sys
 import tempfile
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -42,9 +42,10 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from groq import Groq
+
 from config import GROQ_API_KEY, INDEX_DIR
-from services.retrieval import retrieve_hybrid
 from services.llm import build_prompt, stream_response
+from services.retrieval import retrieve_hybrid
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -111,7 +112,7 @@ def generate_golden_set(
     n_questions:   int = 50,
     q_per_chunk:   int = 2,
     output_path:   str = "evals/golden_set.json",
-) -> List[Dict]:
+) -> list[dict]:
     """
     Sample chunks from the document, generate Q&A pairs for each,
     return and save to output_path.
@@ -130,7 +131,7 @@ def generate_golden_set(
     step = max(1, len(chunks) // n_chunks_needed)
     sampled_indices = list(range(0, len(chunks), step))[:n_chunks_needed]
 
-    golden_set: List[Dict] = []
+    golden_set: list[dict] = []
 
     for idx in sampled_indices:
         chunk_text = chunks[idx]
@@ -170,10 +171,18 @@ def generate_golden_set(
 #  2. Retrieval Evaluation
 # ─────────────────────────────────────────────
 
+def _first_relevant_rank(retrieved_ids: list[int], relevant_ids: list[int]) -> int | None:
+    """Return the one-based rank of the first relevant ID, or None on a miss."""
+    relevant = set(relevant_ids)
+    for index, chunk_id in enumerate(retrieved_ids):
+        if chunk_id in relevant:
+            return index + 1
+    return None
+
 def evaluate_retrieval(
-    golden_set: List[Dict],
+    golden_set: list[dict],
     top_k:      int = 5,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     For each golden question, run retrieval and check if the source chunk
     appears in the top-k results.
@@ -195,12 +204,25 @@ def evaluate_retrieval(
         doc_id  = item["doc_id"]
         query   = item["question"]
         src_cid = item["source_chunk_id"]
+        relevant_ids = item.get("relevant_chunk_ids", [src_cid])
 
-        results  = retrieve_hybrid(doc_id, query, top_k=top_k)
+        retrieval = retrieve_hybrid(doc_id, query, top_k=top_k, diagnostics=True)
+        if isinstance(retrieval, dict):
+            results = retrieval["results"]
+        else:
+            # Keep evaluation compatible with callers that provide the legacy list API.
+            results = retrieval
+            retrieval = {
+                "results": results,
+                "dense_results": results,
+                "bm25_results": results,
+                "rrf_candidates": results,
+                "reranked_results": results,
+            }
         ret_cids = [r["chunk_id"] for r in results]
 
-        hit = src_cid in ret_cids
-        rank = (ret_cids.index(src_cid) + 1) if hit else None
+        rank = _first_relevant_rank(ret_cids, relevant_ids)
+        hit = rank is not None
         rr   = 1.0 / rank if rank else 0.0
 
         hits    += int(hit)
@@ -209,9 +231,24 @@ def evaluate_retrieval(
         per_q.append({
             "question":        query,
             "source_chunk_id": src_cid,
+            "relevant_chunk_ids": relevant_ids,
             "hit":             hit,
             "rank":            rank,
             "retrieved_ids":   ret_cids,
+            "dense_retrieved_ids": [r["chunk_id"] for r in retrieval["dense_results"]],
+            "bm25_retrieved_ids": [r["chunk_id"] for r in retrieval["bm25_results"]],
+            "rrf_candidate_ids": [r["chunk_id"] for r in retrieval["rrf_candidates"]],
+            "reranked_ids": [r["chunk_id"] for r in retrieval["reranked_results"]],
+            "final_top_k_ids": ret_cids,
+            "gold_chunk_stage_presence": {
+                "dense": src_cid in [r["chunk_id"] for r in retrieval["dense_results"]],
+                "bm25": src_cid in [r["chunk_id"] for r in retrieval["bm25_results"]],
+                "rrf": src_cid in [r["chunk_id"] for r in retrieval["rrf_candidates"]],
+                "reranked": src_cid in [r["chunk_id"] for r in retrieval["reranked_results"]],
+                "final_top_k": hit,
+            },
+            "manual_review_candidate_ids": [cid for cid in ret_cids if cid != src_cid],
+            "gold_chunk_only_evaluation": True,
         })
         logger.debug("Q: %s | hit=%s rank=%s", query[:60], hit, rank)
 
@@ -243,7 +280,7 @@ Respond with ONLY a JSON object:
 {{"verdict": "faithful"|"partially_faithful"|"unfaithful", "reason": "one sentence"}}"""
 
 
-def _generate_answer(doc_id: str, question: str, top_k: int = 5) -> Tuple[str, List[Dict]]:
+def _generate_answer(doc_id: str, question: str, top_k: int = 5) -> tuple[str, list[dict]]:
     """Run full retrieval + LLM pipeline. Returns (answer, chunks)."""
     chunks = retrieve_hybrid(doc_id, question, top_k=top_k)
     prompt = build_prompt(question, chunks, response_mode="balanced")
@@ -252,7 +289,7 @@ def _generate_answer(doc_id: str, question: str, top_k: int = 5) -> Tuple[str, L
     return answer, chunks
 
 
-def _judge_faithfulness(question: str, reference: str, system_answer: str) -> Dict:
+def _judge_faithfulness(question: str, reference: str, system_answer: str) -> dict:
     """Ask the judge LLM to score faithfulness."""
     prompt = FAITHFULNESS_JUDGE_PROMPT.format(
         question=question, reference=reference, system_answer=system_answer
@@ -272,13 +309,13 @@ def _judge_faithfulness(question: str, reference: str, system_answer: str) -> Di
 
 
 def evaluate_faithfulness(
-    golden_set: List[Dict],
+    golden_set: list[dict],
     top_k:      int = 5,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generate answers for each golden question, judge faithfulness.
     """
-    verdicts: Dict[str, int] = {"faithful": 0, "partially_faithful": 0, "unfaithful": 0, "error": 0}
+    verdicts: dict[str, int] = {"faithful": 0, "partially_faithful": 0, "unfaithful": 0, "error": 0}
     per_q = []
 
     for i, item in enumerate(golden_set):
@@ -298,7 +335,7 @@ def evaluate_faithfulness(
             "verdict":       verdict,
             "reason":        judgment.get("reason", ""),
         })
-        time.sleep(0.5)  # rate limit buffer
+        time.sleep(1.5)  # rate limit buffer
 
     n = len(golden_set)
     faithfulness_score = round((verdicts["faithful"] + 0.5 * verdicts["partially_faithful"]) / n, 4) if n else 0
@@ -324,7 +361,7 @@ def run_full_eval(
     n_questions:     int  = 50,
     top_k:           int  = 5,
     output_path:     str  = "evals/results.json",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     End-to-end eval. Pass generate_golden=True on first run.
     """

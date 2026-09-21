@@ -1,13 +1,22 @@
-import os, uuid, shutil
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Header
-from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
-from models.database import get_db, Document
-from services.ingestion import run_ingestion
-from config import UPLOAD_DIR, INDEX_DIR
-from pydantic import BaseModel
-from typing import Optional
+import os
+import uuid
 
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    UploadFile,
+)
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from config import INDEX_DIR, UPLOAD_DIR
+from models.database import Document, get_db
+from services.ingestion import run_ingestion
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -41,7 +50,7 @@ def rename_document(
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    x_client_id: Optional[str] = Header(None),
+    x_client_id: str | None = Header(None),
     db: Session = Depends(get_db)
 ):
     ext = file.filename.split(".")[-1].lower()
@@ -87,7 +96,7 @@ def process_document(doc_id: str, file_path: str, file_type: str):
         doc.faiss_index_path = result["index_path"]
         doc.summary = result["summary"]
         db.commit()
-    except Exception as e:
+    except Exception:
         doc = db.query(Document).filter(Document.id == doc_id).first()
         if doc:
             doc.status = "failed"
@@ -96,7 +105,7 @@ def process_document(doc_id: str, file_path: str, file_type: str):
         db.close()
 
 @router.get("/")
-def list_documents(x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
+def list_documents(x_client_id: str | None = Header(None), db: Session = Depends(get_db)):
     docs = db.query(Document).filter(Document.client_id == x_client_id).order_by(Document.upload_date.desc()).all()
     return [
         {
@@ -109,7 +118,7 @@ def list_documents(x_client_id: Optional[str] = Header(None), db: Session = Depe
     ]
 
 @router.delete("/{doc_id}")
-def delete_document(doc_id: str, x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
+def delete_document(doc_id: str, x_client_id: str | None = Header(None), db: Session = Depends(get_db)):
     doc = db.query(Document).filter(Document.id == doc_id, Document.client_id == x_client_id).first()
     if not doc:
         raise HTTPException(404, "Document not found")

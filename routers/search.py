@@ -1,11 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from models.database import (
-    get_db,
-    Document,
-    ChatSession,
-    Message
-)
+
+from models.database import ChatSession, Document, Message, get_db
 
 router = APIRouter(
     prefix="/api/search",

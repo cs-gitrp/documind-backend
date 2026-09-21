@@ -13,15 +13,12 @@ Endpoints:
 
 import json
 import os
-from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from evals.eval_pipeline import (
     generate_golden_set,
-    evaluate_retrieval,
-    evaluate_faithfulness,
     run_full_eval,
 )
 

@@ -1,20 +1,20 @@
 import os
-import shutil
+
 from fastapi import APIRouter, Depends, Header
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
-from models.database import get_db, RAGSettings, Document
+from sqlalchemy.orm import Session
+
 from config import INDEX_DIR, UPLOAD_DIR  # Assumed UPLOAD_DIR is exported here
+from models.database import Document, RAGSettings, get_db
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 class SettingsUpdate(BaseModel):
-    chunk_size: Optional[int] = None
-    chunk_overlap: Optional[int] = None
-    top_k: Optional[int] = None
-    temperature: Optional[float] = None
-    response_mode: Optional[str] = None
+    chunk_size: int | None = None
+    chunk_overlap: int | None = None
+    top_k: int | None = None
+    temperature: float | None = None
+    response_mode: str | None = None
 
 def get_dir_size(path: str) -> float:
     if not os.path.exists(path):
@@ -28,7 +28,7 @@ def get_dir_size(path: str) -> float:
     return round(total / (1024 * 1024), 2)
 
 @router.get("/storage-stats")
-def get_storage_stats(x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
+def get_storage_stats(x_client_id: str | None = Header(None), db: Session = Depends(get_db)):
     from models.database import Document
 
     docs = db.query(Document).filter(Document.client_id == x_client_id).all()
@@ -67,7 +67,7 @@ def update_settings(body: SettingsUpdate, db: Session = Depends(get_db)):
     return {"success": True}
 
 @router.delete("/storage")
-def clear_storage(x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
+def clear_storage(x_client_id: str | None = Header(None), db: Session = Depends(get_db)):
     docs = db.query(Document).filter(Document.client_id == x_client_id).all()
     for doc in docs:
         doc_id = doc.id

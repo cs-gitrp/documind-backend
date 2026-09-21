@@ -1,8 +1,10 @@
-import uuid
 import datetime
-from sqlalchemy import create_engine, Column, String, Integer, Float, Text, DateTime
+import uuid
+
+from sqlalchemy import Column, DateTime, Float, Integer, String, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+
 from config import DATABASE_URL
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})

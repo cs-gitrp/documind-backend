@@ -17,9 +17,9 @@ Both call Groq (same API key already in config.py) — zero extra cost.
 """
 
 import logging
-from typing import List
 
 from groq import Groq
+
 from config import GROQ_API_KEY
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ MULTI_QUERY_SYSTEM = (
     "Output ONLY a numbered list, one query per line, no explanations."
 )
 
-def multi_query_expand(query: str, n: int = 3) -> List[str]:
+def multi_query_expand(query: str, n: int = 3) -> list[str]:
     """
     Returns a list of [original_query] + [n alternative phrasings].
     Always includes the original so callers can use it as a union.

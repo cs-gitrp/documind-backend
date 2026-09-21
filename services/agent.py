@@ -25,12 +25,14 @@ import logging
 import math
 import os
 import re
-from typing import Any, Dict, Generator, List, Optional
+from collections.abc import Generator
+from typing import Any
 
 from groq import Groq
+
 from config import GROQ_API_KEY, INDEX_DIR
-from services.retrieval import retrieve_hybrid
 from services.query_rewriter import rewrite_and_expand
+from services.retrieval import retrieve_hybrid
 
 logger = logging.getLogger(__name__)
 client = Groq(api_key=GROQ_API_KEY)
@@ -208,7 +210,7 @@ def _tool_calculate(expression: str) -> str:
     if re.search(r"\b(import|exec|eval|open|os|sys|__)\b", expression):
         return json.dumps({"error": "Expression blocked for safety."})
     try:
-        result = eval(expression, {"__builtins__": {}}, allowed_names)  # noqa: S307
+        result = eval(expression, {"__builtins__": {}}, allowed_names)
         return json.dumps({"expression": expression, "result": result})
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -283,7 +285,7 @@ If a question cannot be answered from the document, say so clearly."""
 def run_agent(
     query:       str,
     doc_id:      str,
-    history:     List[Dict[str, Any]] | None = None,
+    history:     list[dict[str, Any]] | None = None,
     max_turns:   int = 6,
     temperature: float = 0.3,
 ) -> Generator[str, None, None]:
@@ -291,7 +293,7 @@ def run_agent(
     Agentic loop. Yields tokens for streaming.
     Stops when model produces a non-tool-call response or max_turns reached.
     """
-    messages: List[Dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
     if history:
         messages.extend(history)
     # Inject doc_id context

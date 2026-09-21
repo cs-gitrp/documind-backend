@@ -11,19 +11,18 @@ New vs v1:
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from models.database import get_db, ChatSession, Message, RAGSettings, SessionLocal
-from services.retrieval import retrieve_hybrid
-from services.llm import build_prompt, stream_response
+from models.database import ChatSession, Message, RAGSettings, SessionLocal, get_db
 from services.agent import run_agent
+from services.llm import build_prompt, stream_response
 from services.query_rewriter import rewrite_and_expand
+from services.retrieval import retrieve_hybrid
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -31,7 +30,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 class ChatRequest(BaseModel):
     query:       str
     document_id: str
-    session_id:  Optional[str] = None
+    session_id:  str | None = None
     mode:        str = "rag"       # "rag" | "agent"
     use_hyde:    bool = True       # enable HyDE query rewriting
     use_multi_query: bool = False  # enable multi-query expansion (slower, higher recall)
@@ -40,7 +39,7 @@ class ChatRequest(BaseModel):
 @router.post("/")
 def chat(
     req: ChatRequest,
-    x_client_id: Optional[str] = Header(None),
+    x_client_id: str | None = Header(None),
     db: Session = Depends(get_db),
 ):
     settings      = db.query(RAGSettings).filter(RAGSettings.id == 1).first()
@@ -167,7 +166,7 @@ def _save_assistant_message(session_id: str, content: str, sources: list, sessio
 # ── Session endpoints (unchanged from v1) ──
 
 @router.get("/sessions")
-def get_sessions(x_client_id: Optional[str] = Header(None), db: Session = Depends(get_db)):
+def get_sessions(x_client_id: str | None = Header(None), db: Session = Depends(get_db)):
     sessions = (
         db.query(ChatSession)
         .filter(ChatSession.client_id == x_client_id)
