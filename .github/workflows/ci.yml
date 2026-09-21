@@ -1,0 +1,168 @@
+name: DocuMind CI/CD
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/documind-backend
+
+jobs:
+  # ─── 1. Lint & Unit Tests ────────────────────────────────────────────────
+  test:
+    name: Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff
+
+      - name: Lint with ruff
+        run: ruff check . --select E,F,W --ignore E501
+
+      - name: Run unit tests
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: pytest tests/ -v --tb=short
+
+  # ─── 2. Build & Push Docker Image ────────────────────────────────────────
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── 3. Deploy to Cloud Run (GCP) ────────────────────────────────────────
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy documind-backend \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --platform managed \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --memory 2Gi \
+            --cpu 2 \
+            --concurrency 80 \
+            --set-env-vars "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}"
+
+      - name: Get Cloud Run URL
+        run: |
+          URL=$(gcloud run services describe documind-backend \
+            --platform managed --region us-central1 \
+            --format 'value(status.url)')
+          echo "Deployed to: $URL"
+
+  # ─── 4. RAG Eval Regression Check ────────────────────────────────────────
+  eval-regression:
+    name: RAG Eval Regression
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run eval against golden set
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python evals/eval_pipeline.py \
+            --doc_id ${{ secrets.EVAL_DOC_ID }} \
+            --golden_path evals/golden_set.json \
+            --output_path evals/ci_results.json
+
+      - name: Check eval regression gate
+        run: |
+          python - <<'EOF'
+          import json, sys
+          with open("evals/ci_results.json") as f:
+              r = json.load(f)
+          hit_rate = r["summary"]["hit_rate_at_k"]
+          faith    = r["summary"]["faithfulness_score"]
+          print(f"Hit@5: {hit_rate:.2f}  Faithfulness: {faith:.2f}")
+          # Hard gates — bump these as you improve the system
+          if hit_rate < 0.60:
+              print(f"❌ Hit rate {hit_rate:.2f} < 0.60 — FAILING")
+              sys.exit(1)
+          if faith < 0.65:
+              print(f"❌ Faithfulness {faith:.2f} < 0.65 — FAILING")
+              sys.exit(1)
+          print("✅ All eval gates passed")
+          EOF
+
+      - name: Upload eval results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.sha }}
+          path: evals/ci_results.json

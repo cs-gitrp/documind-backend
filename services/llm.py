@@ -23,7 +23,7 @@ Answer:"""
 
 def stream_response(prompt: str, temperature: float = 0.7):
     stream = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
         stream=True

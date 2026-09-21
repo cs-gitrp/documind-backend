@@ -1,0 +1,114 @@
+[
+  {
+    "question": "What license type is granted for this article?",
+    "answer": "Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License",
+    "question_type": "factual",
+    "source_chunk_id": 0,
+    "source_page": 1,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "Why is sharing adapted material from this article not permitted?",
+    "answer": "Because the license does not allow derivative works; it permits only non-commercial use, sharing, distribution, and reproduction of the original material but not adapted material.",
+    "question_type": "reasoning",
+    "source_chunk_id": 0,
+    "source_page": 1,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "How many patients were included in the study?",
+    "answer": "920",
+    "question_type": "factual",
+    "source_chunk_id": 2,
+    "source_page": 1,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "What does AUROC stand for?",
+    "answer": "areas under the receiver operating characteristic curve",
+    "question_type": "definition",
+    "source_chunk_id": 2,
+    "source_page": 1,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "How many authors contributed to the study described in the chunk?",
+    "answer": "13",
+    "question_type": "numerical",
+    "source_chunk_id": 4,
+    "source_page": 1,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "What is the main focus of the study described in the chunk?",
+    "answer": "Prediction of atrial fibrillation recurrence following catheter ablation using surface ECG and clinical features",
+    "question_type": "factual",
+    "source_chunk_id": 4,
+    "source_page": 1,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "How many patients in the study had paroxysmal atrial fibrillation (PAF)?",
+    "answer": "790",
+    "question_type": "factual",
+    "source_chunk_id": 8,
+    "source_page": 2,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "What definition of persistent atrial fibrillation was used in this study?",
+    "answer": "A sustained episode lasting >7 days and <1 year",
+    "question_type": "definition",
+    "source_chunk_id": 8,
+    "source_page": 2,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "What follow-up schedule was implemented for patients after the index ablation?",
+    "answer": "Follow-up visits were scheduled at 1, 3, 6, and 12 months after index ablation, and at least once a year thereafter.",
+    "question_type": "factual",
+    "source_chunk_id": 16,
+    "source_page": 4,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "How was atrial fibrillation recurrence defined in the study?",
+    "answer": "AF recurrence was defined as any episode lasting longer than 30 seconds on Holter recordings or ECG during clinical visits after index ablation procedure.",
+    "question_type": "definition",
+    "source_chunk_id": 16,
+    "source_page": 4,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "What does the abbreviation LVEF represent?",
+    "answer": "left ventricular ejection fraction",
+    "question_type": "definition",
+    "source_chunk_id": 24,
+    "source_page": 5,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "Which abbreviation in the chunk refers to Pro-Brain Natriuretic Peptide?",
+    "answer": "Pro-BNP",
+    "question_type": "factual",
+    "source_chunk_id": 24,
+    "source_page": 5,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "How many patient-specific models did Roney et al construct to predict long-term response to AF ablation?",
+    "answer": "100",
+    "question_type": "factual",
+    "source_chunk_id": 32,
+    "source_page": 7,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  },
+  {
+    "question": "Why did models that incorporated clinical history, imaging, and simulation stress tests outperform models that used only clinical history and imaging?",
+    "answer": "Because adding simulation stress tests provided additional predictive information that improved the models’ ability to forecast long-term response to AF ablation.",
+    "question_type": "reasoning",
+    "source_chunk_id": 32,
+    "source_page": 7,
+    "doc_id": "4231f3e1-d9a2-46c8-aca0-2499279a39cc"
+  }
+]

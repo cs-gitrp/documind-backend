@@ -1,0 +1,77 @@
+version: "3.9"
+
+# ─── DocuMind v2 — local dev stack ───────────────────────────────────────────
+# Usage:
+#   docker compose up --build           # start everything
+#   docker compose up --build backend   # backend only (SQLite mode)
+#
+# Services:
+#   backend  — FastAPI (port 8000)
+#   frontend — Next.js (port 3000)
+#   db       — PostgreSQL (optional; set DATABASE_URL below to use it)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL (only needed if you want to ditch SQLite locally) ──
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB:       documind
+      POSTGRES_USER:     documind
+      POSTGRES_PASSWORD: documind_dev_password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documind"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  # ── FastAPI Backend ──
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    ports:
+      - "8000:8000"
+    environment:
+      GROQ_API_KEY:   ${GROQ_API_KEY}
+      # Switch to postgres for local testing:
+      DATABASE_URL:   sqlite:///./data/documind.db
+      # DATABASE_URL: postgresql://documind:documind_dev_password@db:5432/documind
+      UPLOAD_DIR:     /app/data/uploads
+      INDEX_DIR:      /app/data/indexes
+    volumes:
+      # Mount source for hot-reload in dev; remove in prod image
+      - .:/app
+      - backend_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Next.js Frontend ──
+  frontend:
+    build:
+      context: ./frontend          # adjust path if your frontend is in a sub-folder
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  backend_data:

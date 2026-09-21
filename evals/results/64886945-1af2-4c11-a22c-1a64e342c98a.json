@@ -1,0 +1,111 @@
+{
+  "doc_id": "64886945-1af2-4c11-a22c-1a64e342c98a",
+  "n_questions": 4,
+  "top_k": 5,
+  "retrieval": {
+    "hit_rate_at_k": 0.75,
+    "mrr": 0.625,
+    "top_k": 5,
+    "n_questions": 4,
+    "hits": 3,
+    "per_question": [
+      {
+        "question": "What is atrial fibrillation as described in the chunk?",
+        "source_chunk_id": 0,
+        "hit": true,
+        "rank": 2,
+        "retrieved_ids": [
+          3,
+          0,
+          56,
+          55,
+          61
+        ]
+      },
+      {
+        "question": "Which institutions are affiliated with the authors listed in the chunk?",
+        "source_chunk_id": 0,
+        "hit": false,
+        "rank": null,
+        "retrieved_ids": [
+          54,
+          5,
+          53,
+          21,
+          6
+        ]
+      },
+      {
+        "question": "What is the reported mean value of the ALT enzyme (U/L) in the first group?",
+        "source_chunk_id": 20,
+        "hit": true,
+        "rank": 1,
+        "retrieved_ids": [
+          20,
+          21,
+          19,
+          46,
+          47
+        ]
+      },
+      {
+        "question": "What is the absolute difference between the mean lactate concentrations (mmol/L) of the two groups?",
+        "source_chunk_id": 20,
+        "hit": true,
+        "rank": 1,
+        "retrieved_ids": [
+          20,
+          21,
+          19,
+          29,
+          16
+        ]
+      }
+    ]
+  },
+  "faithfulness": {
+    "faithfulness_score": 0.0,
+    "verdict_counts": {
+      "faithful": 0,
+      "partially_faithful": 0,
+      "unfaithful": 0,
+      "error": 4
+    },
+    "n_questions": 4,
+    "per_question": [
+      {
+        "question": "What is atrial fibrillation as described in the chunk?",
+        "reference": "Atrial fibrillation (AF) tends to be a common cardiac arrhythmia in hospitalized patients with acute illness.",
+        "system_answer": "Atrial fibrillation (AF) is a common cardiac arrhythmia that frequently occurs in patients hospitalized with acute illness.",
+        "verdict": "error",
+        "reason": "Error code: 404 - {'error': {'message': 'The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'code': 'model_not_found'}}"
+      },
+      {
+        "question": "Which institutions are affiliated with the authors listed in the chunk?",
+        "reference": "Division of Cardiac Electrophysiology, University of Toledo; Indian Institute of Technology, Mandi; Thomas Jefferson Hospital; Mayo Clinic; Department of Anesthesia, Bioengineering, University of Toledo.",
+        "system_answer": "The authors listed in the provided text are affiliated with:\n\n- **University of Toledo** (Division of Cardiac Electrophysiology)",
+        "verdict": "error",
+        "reason": "Error code: 404 - {'error': {'message': 'The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'code': 'model_not_found'}}"
+      },
+      {
+        "question": "What is the reported mean value of the ALT enzyme (U/L) in the first group?",
+        "reference": "23.0",
+        "system_answer": "I cannot find this information in the provided document.",
+        "verdict": "error",
+        "reason": "Error code: 404 - {'error': {'message': 'The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'code': 'model_not_found'}}"
+      },
+      {
+        "question": "What is the absolute difference between the mean lactate concentrations (mmol/L) of the two groups?",
+        "reference": "0.1",
+        "system_answer": "I cannot find this information in the provided document.",
+        "verdict": "error",
+        "reason": "Error code: 404 - {'error': {'message': 'The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'code': 'model_not_found'}}"
+      }
+    ]
+  },
+  "summary": {
+    "hit_rate_at_k": 0.75,
+    "mrr": 0.625,
+    "faithfulness_score": 0.0
+  }
+}

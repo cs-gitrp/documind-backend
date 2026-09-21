@@ -6,7 +6,7 @@ import os
 from models.database import init_db
 from routers import documents, chat, settings
 from routers import search
-
+from routers import eval as eval_router
 app = FastAPI(title="DocuMind AI API", version="1.0.0")
 
 app.add_middleware(
@@ -26,6 +26,7 @@ app.include_router(search.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(settings.router)
+app.include_router(eval_router.router)
 
 @app.on_event("startup")
 async def startup():

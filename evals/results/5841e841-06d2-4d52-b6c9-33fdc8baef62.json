@@ -1,0 +1,151 @@
+{
+  "doc_id": "5841e841-06d2-4d52-b6c9-33fdc8baef62",
+  "n_questions": 6,
+  "top_k": 5,
+  "retrieval": {
+    "hit_rate_at_k": 0.8333,
+    "mrr": 0.8333,
+    "top_k": 5,
+    "n_questions": 6,
+    "hits": 5,
+    "per_question": [
+      {
+        "question": "What random seed was fixed for reproducibility in the training process?",
+        "source_chunk_id": 16,
+        "hit": true,
+        "rank": 1,
+        "retrieved_ids": [
+          16,
+          15,
+          14,
+          56,
+          24
+        ]
+      },
+      {
+        "question": "Why was early stopping with a patience of 10 epochs employed during training?",
+        "source_chunk_id": 16,
+        "hit": true,
+        "rank": 1,
+        "retrieved_ids": [
+          16,
+          15,
+          14,
+          24,
+          5
+        ]
+      },
+      {
+        "question": "What is the mathematical representation of the input signal X in the multiscale CNN module?",
+        "source_chunk_id": 24,
+        "hit": true,
+        "rank": 1,
+        "retrieved_ids": [
+          24,
+          22,
+          27,
+          25,
+          65
+        ]
+      },
+      {
+        "question": "Why are features extracted at different scales merged in the multiscale CNN module?",
+        "source_chunk_id": 24,
+        "hit": true,
+        "rank": 1,
+        "retrieved_ids": [
+          24,
+          10,
+          17,
+          22,
+          30
+        ]
+      },
+      {
+        "question": "Which dataset was used for model training and evaluation in this study?",
+        "source_chunk_id": 56,
+        "hit": true,
+        "rank": 1,
+        "retrieved_ids": [
+          56,
+          14,
+          15,
+          12,
+          58
+        ]
+      },
+      {
+        "question": "How is the MAF-Net model described in terms of its architecture?",
+        "source_chunk_id": 56,
+        "hit": false,
+        "rank": null,
+        "retrieved_ids": [
+          29,
+          54,
+          16,
+          49,
+          20
+        ]
+      }
+    ]
+  },
+  "faithfulness": {
+    "faithfulness_score": 0.3333,
+    "verdict_counts": {
+      "faithful": 2,
+      "partially_faithful": 0,
+      "unfaithful": 0,
+      "error": 4
+    },
+    "n_questions": 6,
+    "per_question": [
+      {
+        "question": "What random seed was fixed for reproducibility in the training process?",
+        "reference": "42",
+        "system_answer": "The random seed was fixed at **42**.",
+        "verdict": "faithful",
+        "reason": "The system answer correctly states the seed as 42 and adds no unsupported information."
+      },
+      {
+        "question": "Why was early stopping with a patience of 10 epochs employed during training?",
+        "reference": "To prevent overfitting",
+        "system_answer": "Early stopping with a patience of 10 epochs was used to prevent overfitting by halting training when the validation performance did not improve for 10 consecutive epochs.",
+        "verdict": "error",
+        "reason": "Expecting value: line 1 column 1 (char 0)"
+      },
+      {
+        "question": "What is the mathematical representation of the input signal X in the multiscale CNN module?",
+        "reference": "X âˆˆ R^{TÃ—d} (time step T, feature dimension d)",
+        "system_answer": "The input signal is denoted as  \n\\[\nX \\;\\in\\; \\mathbb{R}^{T \\times d},\n\\]  \nwhere \\(T\\) is the number of time steps and \\(d\\) is the feature dimension.",
+        "verdict": "faithful",
+        "reason": "The system answer exactly matches the reference representation and correctly explains T and d without adding unsupported information."
+      },
+      {
+        "question": "Why are features extracted at different scales merged in the multiscale CNN module?",
+        "reference": "To overcome the limitations of single-layer convolutions, satisfy global feature extraction requirements, and preserve multi-scale information.",
+        "system_answer": "They are merged to preserve multi‑scale information, thereby overcoming the limitations of a single‑layer convolution, meeting the need for global feature extraction, and making the model better suited for steady electrocardiophysiological signals.",
+        "verdict": "error",
+        "reason": "Expecting value: line 1 column 1 (char 0)"
+      },
+      {
+        "question": "Which dataset was used for model training and evaluation in this study?",
+        "reference": "PTB-XL dataset",
+        "system_answer": "The study used the PTB‑XL dataset for both model training and evaluation.",
+        "verdict": "error",
+        "reason": "Expecting value: line 1 column 1 (char 0)"
+      },
+      {
+        "question": "How is the MAF-Net model described in terms of its architecture?",
+        "reference": "a fusion network based on multimodal cross-attention",
+        "system_answer": "The MAF‑Net model is a multimodal cross‑attention fusion network composed of three main parts:\n\n1. **X‑branch** – processes one modality of the input data.  \n2. **Y‑branch** – processes the second modality.  \n3. **Fusion module** – combines the two branches.  \n\nInside the fusion module, a **bidirectional feature interaction** block uses a **multi‑head attention** layer to allow the X‑branch and Y‑branch features to interact with each other. After this interaction, the augmented features from both branches are **concatenated**. The concatenated vector is then passed through a **global pooling** stage (global average pooling and global max pooling) whose outputs are concatenated to form the final feature representation. This architecture enables the model to fuse multimodal information effectively and improve classification performance.",
+        "verdict": "error",
+        "reason": "Expecting value: line 1 column 1 (char 0)"
+      }
+    ]
+  },
+  "summary": {
+    "hit_rate_at_k": 0.8333,
+    "mrr": 0.8333,
+    "faithfulness_score": 0.3333
+  }
+}

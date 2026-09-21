@@ -1,0 +1,392 @@
+"""
+eval_pipeline.py — DocuMind v2  (RAG Evaluation Framework)
+
+Three-part evaluation:
+
+  1. Golden Set Generation
+     Auto-generate Q&A pairs from the document chunks using the LLM.
+     Output: JSON file with {question, expected_answer, source_chunk_ids}.
+
+  2. Retrieval Evaluation
+     Metric: Hit@k — for each golden question, did the retriever surface
+     at least one of the expected source chunks in top-k results?
+     Also reports: MRR (Mean Reciprocal Rank).
+
+  3. Answer Faithfulness Evaluation (LLM-as-judge)
+     For each golden Q, generate an answer with the pipeline, then ask
+     an LLM judge (Groq) whether the answer is faithful to the reference.
+     Scores: faithful / partially_faithful / unfaithful per question.
+
+Usage (CLI):
+    python evals/eval_pipeline.py \
+        --doc_id <your_doc_id> \
+        --golden_path evals/golden_set.json \
+        --generate_golden      # only on first run
+        --output_path evals/results.json
+
+The eval router (routers/eval.py) wraps this for the API.
+"""
+
+import argparse
+import json
+import logging
+import os
+import sys
+import tempfile
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+
+# Allow running from repo root
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from groq import Groq
+from config import GROQ_API_KEY, INDEX_DIR
+from services.retrieval import retrieve_hybrid
+from services.llm import build_prompt, stream_response
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+client = Groq(api_key=GROQ_API_KEY)
+_EVAL_MODEL  = "openai/gpt-oss-20b"   # used for generation
+_JUDGE_MODEL = "openai/gpt-oss-120b" # larger model as judge
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert NumPy scalars and nested containers to JSON-native values."""
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def _write_json_atomic(path: str, value: Any) -> None:
+    """Serialize completely before replacing the destination file."""
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(dir=directory, prefix=".eval-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(_json_safe(value), handle, indent=2, ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+    except Exception:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise
+
+
+# ─────────────────────────────────────────────
+#  1. Golden Set Generation
+# ─────────────────────────────────────────────
+
+GOLDEN_GEN_PROMPT = """You are creating a RAG evaluation dataset.
+
+Given the following document chunk, generate {n} diverse question-answer pairs.
+The questions should be specific and answerable ONLY from this chunk.
+Include a mix of:
+  - Factual questions (who, what, when, where)
+  - Definition questions
+  - Numerical/quantitative questions (if numbers present)
+  - Reasoning questions (why, how)
+
+Output STRICTLY as a JSON array (no markdown, no extra text):
+[
+  {{"question": "...", "answer": "...", "question_type": "factual|definition|numerical|reasoning"}},
+  ...
+]
+
+Chunk (chunk_id={chunk_id}, page={page}):
+{chunk_text}"""
+
+
+def generate_golden_set(
+    doc_id:        str,
+    n_questions:   int = 50,
+    q_per_chunk:   int = 2,
+    output_path:   str = "evals/golden_set.json",
+) -> List[Dict]:
+    """
+    Sample chunks from the document, generate Q&A pairs for each,
+    return and save to output_path.
+    """
+    meta_path = os.path.join(INDEX_DIR, f"{doc_id}_meta.json")
+    with open(meta_path) as f:
+        meta = json.load(f)
+
+    chunks = meta["chunks"]
+    pages  = meta.get("pages", [1] * len(chunks))
+
+    # Sample evenly across the document
+    import random
+    random.seed(42)
+    n_chunks_needed = min(math.ceil(n_questions / q_per_chunk), len(chunks))
+    step = max(1, len(chunks) // n_chunks_needed)
+    sampled_indices = list(range(0, len(chunks), step))[:n_chunks_needed]
+
+    golden_set: List[Dict] = []
+
+    for idx in sampled_indices:
+        chunk_text = chunks[idx]
+        page       = pages[idx]
+        prompt     = GOLDEN_GEN_PROMPT.format(
+            n=q_per_chunk, chunk_id=idx, page=page, chunk_text=chunk_text[:1500]
+        )
+        try:
+            resp = client.chat.completions.create(
+                model=_EVAL_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.4,
+                max_tokens=600,
+            )
+            raw = resp.choices[0].message.content.strip()
+            # Strip markdown code fences if present
+            raw = raw.replace("```json", "").replace("```", "").strip()
+            pairs = json.loads(raw)
+            for pair in pairs:
+                pair["source_chunk_id"] = idx
+                pair["source_page"]     = page
+                pair["doc_id"]          = doc_id
+                golden_set.append(pair)
+            logger.info("Generated %d Q&A pairs from chunk %d", len(pairs), idx)
+        except Exception as e:
+            logger.warning("Failed to generate Q&A for chunk %d: %s", idx, e)
+            continue
+        time.sleep(0.3)   # rate limit buffer
+
+    golden_set = golden_set[:n_questions]
+    _write_json_atomic(output_path, golden_set)
+    logger.info("Golden set saved: %d questions → %s", len(golden_set), output_path)
+    return golden_set
+
+
+# ─────────────────────────────────────────────
+#  2. Retrieval Evaluation
+# ─────────────────────────────────────────────
+
+def evaluate_retrieval(
+    golden_set: List[Dict],
+    top_k:      int = 5,
+) -> Dict[str, Any]:
+    """
+    For each golden question, run retrieval and check if the source chunk
+    appears in the top-k results.
+
+    Returns:
+        {
+          "hit_rate_at_k": float,   # fraction of questions where source chunk in top-k
+          "mrr":           float,   # Mean Reciprocal Rank
+          "top_k":         int,
+          "n_questions":   int,
+          "per_question":  List[Dict]
+        }
+    """
+    hits  = 0
+    rr_sum = 0.0
+    per_q  = []
+
+    for item in golden_set:
+        doc_id  = item["doc_id"]
+        query   = item["question"]
+        src_cid = item["source_chunk_id"]
+
+        results  = retrieve_hybrid(doc_id, query, top_k=top_k)
+        ret_cids = [r["chunk_id"] for r in results]
+
+        hit = src_cid in ret_cids
+        rank = (ret_cids.index(src_cid) + 1) if hit else None
+        rr   = 1.0 / rank if rank else 0.0
+
+        hits    += int(hit)
+        rr_sum  += rr
+
+        per_q.append({
+            "question":        query,
+            "source_chunk_id": src_cid,
+            "hit":             hit,
+            "rank":            rank,
+            "retrieved_ids":   ret_cids,
+        })
+        logger.debug("Q: %s | hit=%s rank=%s", query[:60], hit, rank)
+
+    n  = len(golden_set)
+    return {
+        "hit_rate_at_k": round(hits / n, 4) if n else 0,
+        "mrr":           round(rr_sum / n, 4) if n else 0,
+        "top_k":         top_k,
+        "n_questions":   n,
+        "hits":          hits,
+        "per_question":  per_q,
+    }
+
+
+# ─────────────────────────────────────────────
+#  3. Answer Faithfulness (LLM-as-judge)
+# ─────────────────────────────────────────────
+
+FAITHFULNESS_JUDGE_PROMPT = """You are an impartial judge evaluating RAG system outputs.
+
+Question: {question}
+Reference Answer: {reference}
+System Answer: {system_answer}
+
+Evaluate whether the System Answer is faithful to the Reference Answer and does not
+contain hallucinations (facts not in the reference).
+
+Respond with ONLY a JSON object:
+{{"verdict": "faithful"|"partially_faithful"|"unfaithful", "reason": "one sentence"}}"""
+
+
+def _generate_answer(doc_id: str, question: str, top_k: int = 5) -> Tuple[str, List[Dict]]:
+    """Run full retrieval + LLM pipeline. Returns (answer, chunks)."""
+    chunks = retrieve_hybrid(doc_id, question, top_k=top_k)
+    prompt = build_prompt(question, chunks, response_mode="balanced")
+    tokens = list(stream_response(prompt, temperature=0.2))
+    answer = "".join(tokens)
+    return answer, chunks
+
+
+def _judge_faithfulness(question: str, reference: str, system_answer: str) -> Dict:
+    """Ask the judge LLM to score faithfulness."""
+    prompt = FAITHFULNESS_JUDGE_PROMPT.format(
+        question=question, reference=reference, system_answer=system_answer
+    )
+    try:
+        resp = client.chat.completions.create(
+            model=_JUDGE_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=150,
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        return {"verdict": "error", "reason": str(e)}
+
+
+def evaluate_faithfulness(
+    golden_set: List[Dict],
+    top_k:      int = 5,
+) -> Dict[str, Any]:
+    """
+    Generate answers for each golden question, judge faithfulness.
+    """
+    verdicts: Dict[str, int] = {"faithful": 0, "partially_faithful": 0, "unfaithful": 0, "error": 0}
+    per_q = []
+
+    for i, item in enumerate(golden_set):
+        logger.info("Faithfulness eval %d/%d: %s", i + 1, len(golden_set), item["question"][:60])
+        sys_answer = ""
+        try:
+            sys_answer, _ = _generate_answer(item["doc_id"], item["question"], top_k)
+            judgment = _judge_faithfulness(item["question"], item["answer"], sys_answer)
+        except Exception as exc:
+            judgment = {"verdict": "error", "reason": str(exc)}
+        verdict       = judgment.get("verdict", "error")
+        verdicts[verdict] = verdicts.get(verdict, 0) + 1
+        per_q.append({
+            "question":      item["question"],
+            "reference":     item["answer"],
+            "system_answer": sys_answer,
+            "verdict":       verdict,
+            "reason":        judgment.get("reason", ""),
+        })
+        time.sleep(0.5)  # rate limit buffer
+
+    n = len(golden_set)
+    faithfulness_score = round((verdicts["faithful"] + 0.5 * verdicts["partially_faithful"]) / n, 4) if n else 0
+    return {
+        "faithfulness_score": faithfulness_score,
+        "verdict_counts":     verdicts,
+        "n_questions":        n,
+        "per_question":       per_q,
+    }
+
+
+# ─────────────────────────────────────────────
+#  Master runner
+# ─────────────────────────────────────────────
+
+import math  # imported here so it's available in generate_golden_set
+
+
+def run_full_eval(
+    doc_id:          str,
+    golden_path:     str  = "evals/golden_set.json",
+    generate_golden: bool = False,
+    n_questions:     int  = 50,
+    top_k:           int  = 5,
+    output_path:     str  = "evals/results.json",
+) -> Dict[str, Any]:
+    """
+    End-to-end eval. Pass generate_golden=True on first run.
+    """
+    # Load or generate golden set
+    if generate_golden or not os.path.exists(golden_path):
+        logger.info("Generating golden set (%d Q&A)…", n_questions)
+        golden_set = generate_golden_set(doc_id, n_questions=n_questions, output_path=golden_path)
+    else:
+        with open(golden_path) as f:
+            golden_set = json.load(f)
+        logger.info("Loaded golden set: %d questions from %s", len(golden_set), golden_path)
+
+    logger.info("Running retrieval evaluation…")
+    retrieval_results = evaluate_retrieval(golden_set, top_k=top_k)
+
+    logger.info("Running faithfulness evaluation (LLM-as-judge)…")
+    faithfulness_results = evaluate_faithfulness(golden_set, top_k=top_k)
+
+    results = {
+        "doc_id":       doc_id,
+        "n_questions":  len(golden_set),
+        "top_k":        top_k,
+        "retrieval":    retrieval_results,
+        "faithfulness": faithfulness_results,
+        "summary": {
+            "hit_rate_at_k":      retrieval_results["hit_rate_at_k"],
+            "mrr":                retrieval_results["mrr"],
+            "faithfulness_score": faithfulness_results["faithfulness_score"],
+        },
+    }
+
+    _write_json_atomic(output_path, results)
+    logger.info("Eval results saved → %s", output_path)
+    logger.info(
+        "SUMMARY | Hit@%d: %.2f | MRR: %.2f | Faithfulness: %.2f",
+        top_k,
+        results["summary"]["hit_rate_at_k"],
+        results["summary"]["mrr"],
+        results["summary"]["faithfulness_score"],
+    )
+    return results
+
+
+# ─────────────────────────────────────────────
+#  CLI entry point
+# ─────────────────────────────────────────────
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="DocuMind RAG Evaluation Pipeline")
+    parser.add_argument("--doc_id",          required=True)
+    parser.add_argument("--golden_path",     default="evals/golden_set.json")
+    parser.add_argument("--generate_golden", action="store_true")
+    parser.add_argument("--n_questions",     type=int, default=50)
+    parser.add_argument("--top_k",           type=int, default=5)
+    parser.add_argument("--output_path",     default="evals/results.json")
+    args = parser.parse_args()
+
+    run_full_eval(
+        doc_id=args.doc_id,
+        golden_path=args.golden_path,
+        generate_golden=args.generate_golden,
+        n_questions=args.n_questions,
+        top_k=args.top_k,
+        output_path=args.output_path,
+    )

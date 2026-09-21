@@ -1,0 +1,50 @@
+[
+  {
+    "question": "What random seed was fixed for reproducibility in the training process?",
+    "answer": "42",
+    "question_type": "factual",
+    "source_chunk_id": 16,
+    "source_page": 4,
+    "doc_id": "5841e841-06d2-4d52-b6c9-33fdc8baef62"
+  },
+  {
+    "question": "Why was early stopping with a patience of 10 epochs employed during training?",
+    "answer": "To prevent overfitting",
+    "question_type": "reasoning",
+    "source_chunk_id": 16,
+    "source_page": 4,
+    "doc_id": "5841e841-06d2-4d52-b6c9-33fdc8baef62"
+  },
+  {
+    "question": "What is the mathematical representation of the input signal X in the multiscale CNN module?",
+    "answer": "X ∈ R^{T×d} (time step T, feature dimension d)",
+    "question_type": "factual",
+    "source_chunk_id": 24,
+    "source_page": 6,
+    "doc_id": "5841e841-06d2-4d52-b6c9-33fdc8baef62"
+  },
+  {
+    "question": "Why are features extracted at different scales merged in the multiscale CNN module?",
+    "answer": "To overcome the limitations of single-layer convolutions, satisfy global feature extraction requirements, and preserve multi-scale information.",
+    "question_type": "reasoning",
+    "source_chunk_id": 24,
+    "source_page": 6,
+    "doc_id": "5841e841-06d2-4d52-b6c9-33fdc8baef62"
+  },
+  {
+    "question": "Which dataset was used for model training and evaluation in this study?",
+    "answer": "PTB-XL dataset",
+    "question_type": "factual",
+    "source_chunk_id": 56,
+    "source_page": 17,
+    "doc_id": "5841e841-06d2-4d52-b6c9-33fdc8baef62"
+  },
+  {
+    "question": "How is the MAF-Net model described in terms of its architecture?",
+    "answer": "a fusion network based on multimodal cross-attention",
+    "question_type": "definition",
+    "source_chunk_id": 56,
+    "source_page": 17,
+    "doc_id": "5841e841-06d2-4d52-b6c9-33fdc8baef62"
+  }
+]

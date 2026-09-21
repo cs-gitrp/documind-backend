@@ -1,0 +1,34 @@
+[
+  {
+    "question": "What is atrial fibrillation as described in the chunk?",
+    "answer": "Atrial fibrillation (AF) tends to be a common cardiac arrhythmia in hospitalized patients with acute illness.",
+    "question_type": "definition",
+    "source_chunk_id": 0,
+    "source_page": 1,
+    "doc_id": "64886945-1af2-4c11-a22c-1a64e342c98a"
+  },
+  {
+    "question": "Which institutions are affiliated with the authors listed in the chunk?",
+    "answer": "Division of Cardiac Electrophysiology, University of Toledo; Indian Institute of Technology, Mandi; Thomas Jefferson Hospital; Mayo Clinic; Department of Anesthesia, Bioengineering, University of Toledo.",
+    "question_type": "factual",
+    "source_chunk_id": 0,
+    "source_page": 1,
+    "doc_id": "64886945-1af2-4c11-a22c-1a64e342c98a"
+  },
+  {
+    "question": "What is the reported mean value of the ALT enzyme (U/L) in the first group?",
+    "answer": "23.0",
+    "question_type": "factual",
+    "source_chunk_id": 20,
+    "source_page": 4,
+    "doc_id": "64886945-1af2-4c11-a22c-1a64e342c98a"
+  },
+  {
+    "question": "What is the absolute difference between the mean lactate concentrations (mmol/L) of the two groups?",
+    "answer": "0.1",
+    "question_type": "numerical",
+    "source_chunk_id": 20,
+    "source_page": 4,
+    "doc_id": "64886945-1af2-4c11-a22c-1a64e342c98a"
+  }
+]
