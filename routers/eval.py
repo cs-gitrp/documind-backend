@@ -32,14 +32,14 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 class GoldenSetRequest(BaseModel):
     doc_id:      str
-    n_questions: int = 50
+    n_questions: int = 20
     regenerate:  bool = False
 
 
 class EvalRequest(BaseModel):
     doc_id:      str
     top_k:       int  = 5
-    n_questions: int  = 50
+    n_questions: int  = 20
     run_faithfulness: bool = True  # set False for faster retrieval-only runs
 
 
@@ -78,7 +78,7 @@ def _run_eval_task(doc_id: str, top_k: int, n_questions: int, run_faithfulness: 
     results_path = os.path.join(RESULTS_DIR, f"{doc_id}.json")
     _running_evals[doc_id] = "running"
     try:
-        results = run_full_eval(
+        run_full_eval(
             doc_id=doc_id,
             golden_path=golden_path,
             generate_golden=not os.path.exists(golden_path),

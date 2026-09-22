@@ -31,6 +31,7 @@ import argparse
 import json
 import logging
 import os
+import re as _re
 import sys
 import tempfile
 import time
@@ -90,12 +91,12 @@ def _write_json_atomic(path: str, value: Any) -> None:
 GOLDEN_GEN_PROMPT = """You are creating a RAG evaluation dataset.
 
 Given the following document chunk, generate {n} diverse question-answer pairs.
-The questions should be specific and answerable ONLY from this chunk.
-Include a mix of:
-  - Factual questions (who, what, when, where)
-  - Definition questions
-  - Numerical/quantitative questions (if numbers present)
-  - Reasoning questions (why, how)
+STRICT RULES:
+- Questions must be answerable ONLY from the text in this chunk
+- Do NOT generate questions about author names, affiliations, institutions, acknowledgements, or references
+- Do NOT generate questions that require information from other chunks
+- Focus on: methods, findings, definitions, numerical results, experimental details, conclusions
+- Answers must be specific and extractable directly from the chunk text
 
 Output STRICTLY as a JSON array (no markdown, no extra text):
 [
@@ -109,7 +110,7 @@ Chunk (chunk_id={chunk_id}, page={page}):
 
 def generate_golden_set(
     doc_id:        str,
-    n_questions:   int = 50,
+    n_questions:   int = 20,
     q_per_chunk:   int = 2,
     output_path:   str = "evals/golden_set.json",
 ) -> list[dict]:
@@ -159,7 +160,19 @@ def generate_golden_set(
         except Exception as e:
             logger.warning("Failed to generate Q&A for chunk %d: %s", idx, e)
             continue
-        time.sleep(0.3)   # rate limit buffer
+        # Intentional delay to reduce free-tier rate-limit pressure.
+        time.sleep(3.0)
+
+    # Filter out metadata/attribution questions that are unfair retrieval targets
+    skip_keywords = [
+        "author", "affiliation", "institution", "acknowledge",
+        "correspond", "department", "university", "email"
+    ]
+
+    golden_set = [
+        q for q in golden_set
+        if not any(kw in q["question"].lower() for kw in skip_keywords)
+    ]
 
     golden_set = golden_set[:n_questions]
     _write_json_atomic(output_path, golden_set)
@@ -289,23 +302,40 @@ def _generate_answer(doc_id: str, question: str, top_k: int = 5) -> tuple[str, l
     return answer, chunks
 
 
+
 def _judge_faithfulness(question: str, reference: str, system_answer: str) -> dict:
-    """Ask the judge LLM to score faithfulness."""
+    """Ask the judge LLM to score faithfulness. Retries once on parse failure."""
     prompt = FAITHFULNESS_JUDGE_PROMPT.format(
         question=question, reference=reference, system_answer=system_answer
     )
-    try:
-        resp = client.chat.completions.create(
-            model=_JUDGE_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=150,
-        )
-        raw = resp.choices[0].message.content.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        return json.loads(raw)
-    except Exception as e:
-        return {"verdict": "error", "reason": str(e)}
+    for attempt in range(3):
+        try:
+            resp = client.chat.completions.create(
+                model=_JUDGE_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are a strict JSON-only evaluator. Output ONLY a valid JSON object. No markdown, no explanation, no code fences."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.0,
+                max_tokens=200,
+            )
+            raw = resp.choices[0].message.content or ""
+            # Strip markdown fences
+            raw = raw.replace("```json", "").replace("```", "").strip()
+            # Extract first JSON object if model added text around it
+            match = _re.search(r'\{.*?\}', raw, _re.DOTALL)
+            if match:
+                raw = match.group(0)
+            result = json.loads(raw)
+            if "verdict" in result:
+                return result
+        except (json.JSONDecodeError, ValueError) as e:
+            if attempt == 2:
+                return {"verdict": "error", "reason": f"Parse failed after 3 attempts: {e}"}
+            time.sleep(2)
+        except Exception as e:  # noqa: BLE001
+            return {"verdict": "error", "reason": str(e)}
+    return {"verdict": "error", "reason": "Max retries exceeded"}
 
 
 def evaluate_faithfulness(
@@ -335,7 +365,7 @@ def evaluate_faithfulness(
             "verdict":       verdict,
             "reason":        judgment.get("reason", ""),
         })
-        time.sleep(1.5)  # rate limit buffer
+        time.sleep(2.5)  # rate limit buffer
 
     n = len(golden_set)
     faithfulness_score = round((verdicts["faithful"] + 0.5 * verdicts["partially_faithful"]) / n, 4) if n else 0
@@ -358,7 +388,7 @@ def run_full_eval(
     doc_id:          str,
     golden_path:     str  = "evals/golden_set.json",
     generate_golden: bool = False,
-    n_questions:     int  = 50,
+    n_questions:     int  = 20,
     top_k:           int  = 5,
     output_path:     str  = "evals/results.json",
 ) -> dict[str, Any]:
@@ -402,6 +432,14 @@ def run_full_eval(
         results["summary"]["mrr"],
         results["summary"]["faithfulness_score"],
     )
+    # Log to MLflow
+    try:
+        from services.experiment_tracker import log_eval_run
+        run_id = log_eval_run(results)
+        results["mlflow_run_id"] = run_id
+        logger.info("MLflow run logged: %s", run_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("MLflow logging skipped (not configured)")
     return results
 
 
@@ -414,7 +452,7 @@ if __name__ == "__main__":
     parser.add_argument("--doc_id",          required=True)
     parser.add_argument("--golden_path",     default="evals/golden_set.json")
     parser.add_argument("--generate_golden", action="store_true")
-    parser.add_argument("--n_questions",     type=int, default=50)
+    parser.add_argument("--n_questions",     type=int, default=20)
     parser.add_argument("--top_k",           type=int, default=5)
     parser.add_argument("--output_path",     default="evals/results.json")
     args = parser.parse_args()

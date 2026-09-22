@@ -275,11 +275,12 @@ def _execute_tool(name: str, args: dict) -> str:
 
 SYSTEM_PROMPT = """You are DocuMind, an intelligent document analysis assistant.
 
-You have access to tools to search documents, perform calculations, and extract metadata.
-ALWAYS use search_document before answering any question about document content.
-If the user asks about numbers or calculations, use the calculate tool.
-Be concise but thorough. Cite page numbers from retrieved passages.
-If a question cannot be answered from the document, say so clearly."""
+Rules:
+1. Call search_document ONCE per question — do not repeat the same search.
+2. After receiving tool results, IMMEDIATELY write your final answer. Do not search again unless the results were completely empty.
+3. Cite page numbers from retrieved passages in your answer.
+4. If a question cannot be answered from the document, say so clearly after ONE search attempt.
+5. Keep answers concise and factual."""
 
 
 def run_agent(
@@ -301,12 +302,14 @@ def run_agent(
     messages.append({"role": "user", "content": user_msg})
 
     for turn in range(max_turns):
+        # Force a final answer after turn 3 to prevent infinite tool loops.
+        tool_choice = "none" if turn >= 3 else "auto"
         try:
             response = client.chat.completions.create(
                 model=_AGENT_MODEL,
                 messages=messages,
                 tools=TOOLS,
-                tool_choice="auto",
+                tool_choice=tool_choice,
                 temperature=temperature,
                 max_tokens=2048,
             )

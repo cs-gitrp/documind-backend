@@ -31,11 +31,11 @@ jobs:
           pip install pytest ruff
 
       - name: Lint with ruff
-        run: ruff check . --select E,F,W --ignore E501
+        run: ruff check . --select E,F,W --ignore E501,BLE001,B008
 
       - name: Run unit tests
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY: ${{secrets.GROQ_API_KEY}}
         run: pytest tests/ -v --tb=short
 
   # ─── 2. Build & Push Docker Image ────────────────────────────────────────
