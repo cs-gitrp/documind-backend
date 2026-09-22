@@ -119,7 +119,7 @@ def generate_golden_set(
     return and save to output_path.
     """
     meta_path = os.path.join(INDEX_DIR, f"{doc_id}_meta.json")
-    with open(meta_path) as f:
+    with open(meta_path, encoding="utf-8") as f:
         meta = json.load(f)
 
     chunks = meta["chunks"]
@@ -400,7 +400,7 @@ def run_full_eval(
         logger.info("Generating golden set (%d Q&A)…", n_questions)
         golden_set = generate_golden_set(doc_id, n_questions=n_questions, output_path=golden_path)
     else:
-        with open(golden_path) as f:
+        with open(golden_path, encoding="utf-8") as f:
             golden_set = json.load(f)
         logger.info("Loaded golden set: %d questions from %s", len(golden_set), golden_path)
 

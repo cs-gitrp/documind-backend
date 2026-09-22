@@ -1,0 +1,90 @@
+[
+  {
+    "question": "What is the title of the project described in the chunk?",
+    "answer": "Neuron: Persistent Memory Layer for Large Language Models",
+    "question_type": "factual",
+    "source_chunk_id": 0,
+    "source_page": 1,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What factors does the ranking strategy for retrieving contextually relevant memories account for?",
+    "answer": "semantic similarity and memory importance",
+    "question_type": "factual",
+    "source_chunk_id": 12,
+    "source_page": 5,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What is the purpose of representing conversational memories using vector embeddings in this study?",
+    "answer": "so that information can be retrieved according to semantic similarity rather than exact keyword matching or chronological position",
+    "question_type": "definition",
+    "source_chunk_id": 12,
+    "source_page": 5,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What is the focus of RQ1 in the research questions?",
+    "answer": "Can semantic retrieval provide useful long-term conversational context without repeatedly transmitting complete conversation histories to the underlying language model?",
+    "question_type": "factual",
+    "source_chunk_id": 15,
+    "source_page": 6,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "Which research question addresses the impact of the memory architecture on retrieval and overall response latency?",
+    "answer": "RQ5: What effect does the proposed memory architecture have on retrieval latency and overall response latency?",
+    "question_type": "factual",
+    "source_chunk_id": 15,
+    "source_page": 6,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What four components make up the client layer in Neuron?",
+    "answer": "The client layer consists of the Chat UI, the Memory Dashboard, the Session Manager, and Supabase Auth.",
+    "question_type": "factual",
+    "source_chunk_id": 21,
+    "source_page": 9,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What is the dimensionality of the vector produced by embedText(message) in the Chat Request Flow?",
+    "answer": "The vector is 768-dimensional.",
+    "question_type": "numerical",
+    "source_chunk_id": 21,
+    "source_page": 9,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What does the function rankMemories() do in the described process?",
+    "answer": "It re-ranks memories by similarity multiplied by importance and selects the top-6 memories.",
+    "question_type": "factual",
+    "source_chunk_id": 24,
+    "source_page": 9,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What is the dimensionality of the embeddings stored in ChromaDB?",
+    "answer": "768-dimensional",
+    "question_type": "numerical",
+    "source_chunk_id": 24,
+    "source_page": 9,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "Which statistical test is used to determine pairwise statistical significance in coherence scoring?",
+    "answer": "Wilcoxon signed-rank test",
+    "question_type": "factual",
+    "source_chunk_id": 27,
+    "source_page": 10,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  },
+  {
+    "question": "What memory store sizes were used in Experiment 4 to measure end‑to‑end latency?",
+    "answer": "100, 500, 1000, and 5000 records",
+    "question_type": "numerical",
+    "source_chunk_id": 27,
+    "source_page": 10,
+    "doc_id": "7824d422-5c14-4ac5-8bea-a3786ca28b97"
+  }
+]

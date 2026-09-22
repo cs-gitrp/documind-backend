@@ -52,7 +52,7 @@ async def create_golden_set(req: GoldenSetRequest):
     """Generate a golden Q&A set for the document. Cached unless regenerate=True."""
     golden_path = os.path.join(GOLDEN_DIR, f"{req.doc_id}.json")
     if os.path.exists(golden_path) and not req.regenerate:
-        with open(golden_path) as f:
+        with open(golden_path, encoding="utf-8") as f:
             existing = json.load(f)
         return {
             "status":      "cached",
@@ -121,7 +121,7 @@ async def get_results(doc_id: str):
     if not os.path.exists(results_path):
         status = _running_evals.get(doc_id, "not_started")
         raise HTTPException(404, f"No results found. Eval status: {status}")
-    with open(results_path) as f:
+    with open(results_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -130,7 +130,7 @@ async def get_golden_set(doc_id: str, limit: int = 20):
     golden_path = os.path.join(GOLDEN_DIR, f"{doc_id}.json")
     if not os.path.exists(golden_path):
         raise HTTPException(404, "Golden set not found. POST /api/eval/golden-set first.")
-    with open(golden_path) as f:
+    with open(golden_path, encoding="utf-8") as f:
         golden_set = json.load(f)
     return {
         "doc_id":      doc_id,
